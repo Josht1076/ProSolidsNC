@@ -1,42 +1,47 @@
-# NCneticNpp — Gcode CNC backplot/simulation plugin for Notepad++
+# NCnetic Standalone — G-code backplot/simulation application
 
-A Notepad++ plugin to plot gcode files directly in the best code editor.
-<br><br>
-<img src="notepad_gcode.png"/>
-<br><br>
+NCnetic Standalone is a Windows Forms desktop application that loads G-code files and visualizes the toolpath in 3D using the NCnetic core and view libraries. It is distributed as a self-contained app (not a Notepad++ plugin) so you can open, scrub through, and replay programs without installing additional editors.
 
-How it works?
--------------
+![NCnetic Standalone preview](notepad_gcode.png)
 
-Open a numerical control file and use the **Plot/Refresh** command of the plugin to simulate the corresponding toolpath. You can set the default 3D view and the styling (text coloring) in the options.
+## Features
+- Load `.nc`, `.tap`, and other CNC program files and see the corresponding toolpath in a 3D viewport.
+- Scrub through individual moves with a timeline control to inspect specific lines.
+- Play/pause animation of the program to review motion sequences.
+- Adjustable camera and view options powered by OpenTK.
 
-Manual installation
------------------
+## Building
+The solution targets .NET 8 Windows desktop. You need the .NET 8 SDK with Windows targeting enabled.
 
-1. Download the plugin: https://www.ncnetic.com/NCneticNppDemoPlugin.zip
+1. Restore and build the solution:
+   ```bash
+   dotnet build NCneticStandalone.sln -c Release
+   ```
+2. The executable and supporting assemblies are produced under `NCneticStandalone/bin/Release/net8.0-windows7.0/`.
 
-2. Locate the Notepad++ plugins folder: 
-    * **32-bit**: C:\Program Files (x86)\Notepad++\plugins 
-    * **64-bit**: C:\Program Files\Notepad++\plugins
+## Running
+Run the built executable on Windows:
+```bash
+NCneticStandalone/bin/Release/net8.0-windows7.0/NCneticStandalone.exe
+```
 
-3. Add the corresponding plugin file: 
-    * **32-bit**: C:\Program Files (x86)\Notepad++\plugins\NCneticNpp\NCneticNpp.dll
-    * **64-bit**: C:\Program Files\Notepad++\plugins\NCneticNpp\NCneticNpp.dll
-  
-Video
--------------
+## Usage
+1. Launch the application and open a G-code file (File → Open).
+2. The editor panel shows the raw program while the right panel renders the toolpath.
+3. Use the play/pause buttons to animate execution or drag the slider to jump to a specific move. Selecting a move highlights the corresponding line in the editor.
 
-[<img src="Thumbnail.png" width="600"/>](https://www.youtube.com/embed/AldBb7LKf30)
+## Potential enhancements
+- **Machine profiles and work offsets**: allow saving multiple machine configurations (travel limits, tool tables, G54–G59 offsets) and apply them when simulating a program.
+- **Collision/limit warnings**: flag rapid moves outside machine limits or potential collisions with stock/fixtures before running on a machine.
+- **Stock and tool library**: define stock geometry and cutting tools so rendered material removal better matches real jobs.
+- **Measurement tools**: measure distances/angles in the 3D view to confirm clearances and feature sizes.
+- **Step-through execution**: add single-line/step buttons to trace program flow line by line with call stack for subprograms.
+- **Annotation and markup**: drop pins or comments on the toolpath to communicate issues or setup notes with operators.
+- **File watching and reload**: auto-reload the visualization when the opened G-code file changes on disk during edits.
+- **Import/export options**: export toolpaths as images/videos and import from additional formats (e.g., Heidenhain, Fanuc conversational where feasible).
+- **Macro and param inspection**: surface variable values (e.g., `#100`) and macro evaluations to debug parameterized programs.
 
-Additional information
-----------------------
-
-NCnetic website: https://ncnetic.com
-
-3d graphics module : https://github.com/opentk
-
-Notepad++ plugin template : https://github.com/kbilsted/NotepadPlusPlusPluginPack.Net
-
-And last be not least, Notepad++ himself : https://github.com/notepad-plus-plus/notepad-plus-plus
-
-Thanks to all contributors!
+## Credits
+- [OpenTK](https://github.com/opentk) for 3D graphics.
+- NCnetic core and view components contained in this repository.
+- Original project authors and contributors.
