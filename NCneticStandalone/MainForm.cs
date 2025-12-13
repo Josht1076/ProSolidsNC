@@ -38,6 +38,7 @@ namespace NCneticStandalone
         private ToolStrip toolStrip1;
         private ToolStripButton toolStripButton1;
         private ToolStripButton toolStripButton2;
+        private ToolStripLabel measureToolStripLabel;
         private ToolStripMenuItem fileToolStripMenuItem;
         private ToolStripMenuItem openToolStripMenuItem;
         private ToolStripMenuItem saveToolStripMenuItem;
@@ -45,6 +46,10 @@ namespace NCneticStandalone
         private ToolStripMenuItem exitToolStripMenuItem;
         private SplitContainer splitContainer1;
         private string currentFile = string.Empty;
+
+        private Vector3? measureStartPoint = null;
+        private int _downMouseX;
+        private int _downMouseY;
 
         // Timer for play/pause
         private Timer _timer;
@@ -54,6 +59,8 @@ namespace NCneticStandalone
         {
             // First, wire up any Designer controls
             InitializeComponent();
+
+            KeyPreview = true;
 
             // Window settings
             Text = "NCnetic Standalone";
@@ -97,6 +104,8 @@ namespace NCneticStandalone
             // Set up playback timer
             _timer = new Timer { Interval = 200 };
             _timer.Tick += (s, e) => Step();
+
+            KeyDown += MainForm_KeyDown;
         }
 
         private void HookViewEvents()
@@ -117,6 +126,44 @@ namespace NCneticStandalone
                     HighlightLine(job.MoveList[selId].Line);
                 }
             };
+
+            glControl.MouseDown += (s, e) =>
+            {
+                _downMouseX = e.X;
+                _downMouseY = e.Y;
+
+                if (e.Button == MouseButtons.Left)
+                {
+                    if (ModifierKeys.HasFlag(Keys.Control))
+                    {
+                        HandleMeasureClick(e.X, e.Y);
+                    }
+                    else
+                    {
+                        view.MouseMoveSelect(e.X, e.Y);
+                    }
+                }
+            };
+
+            glControl.MouseWheel += (s, e) => view.WheelZoom(e.X, e.Y, e.Delta);
+
+            glControl.MouseMove += (s, e) =>
+            {
+                if (e.Button == MouseButtons.Middle)
+                {
+                    view.MousePan(ref _downMouseX, ref _downMouseY, e.X - _downMouseX, e.Y - _downMouseY);
+                }
+                else if (e.Button == MouseButtons.Right)
+                {
+                    view.MouseRotate(ref _downMouseX, ref _downMouseY, e.X - _downMouseX, e.Y - _downMouseY);
+                }
+                else if (e.Button == MouseButtons.None)
+                {
+                    view.MouseHighlight(e.X, e.Y);
+                }
+            };
+
+            glControl.MouseDoubleClick += (s, e) => view.Recenter();
         }
 
         private void TrackBar_ValueChanged(object sender, EventArgs e)
@@ -149,6 +196,8 @@ namespace NCneticStandalone
                 view.Recenter();
                 trackBar.Maximum = Math.Max(0, job.MoveList.Count - 1);
                 trackBar.Value = 0;
+                measureStartPoint = null;
+                measureToolStripLabel.Text = "Measure: Ctrl+Click two points";
             };
         }
 
@@ -178,6 +227,7 @@ namespace NCneticStandalone
             toolStrip1 = new ToolStrip();
             toolStripButton1 = new ToolStripButton();
             toolStripButton2 = new ToolStripButton();
+            measureToolStripLabel = new ToolStripLabel();
             fileToolStripMenuItem = new ToolStripMenuItem();
             openToolStripMenuItem = new ToolStripMenuItem();
             saveToolStripMenuItem = new ToolStripMenuItem();
@@ -201,7 +251,7 @@ namespace NCneticStandalone
             // 
             // toolStrip1
             // 
-            toolStrip1.Items.AddRange(new ToolStripItem[] { toolStripButton1, toolStripButton2 });
+            toolStrip1.Items.AddRange(new ToolStripItem[] { toolStripButton1, toolStripButton2, measureToolStripLabel });
             toolStrip1.Location = new System.Drawing.Point(0, 24);
             toolStrip1.Name = "toolStrip1";
             toolStrip1.Size = new System.Drawing.Size(1189, 25);
@@ -227,9 +277,16 @@ namespace NCneticStandalone
             toolStripButton2.Size = new System.Drawing.Size(23, 22);
             toolStripButton2.Text = "toolStripButton2";
             toolStripButton2.Click += toolStripButton2_Click;
-            // 
+            //
+            // measureToolStripLabel
+            //
+            measureToolStripLabel.Margin = new Padding(10, 1, 0, 2);
+            measureToolStripLabel.Name = "measureToolStripLabel";
+            measureToolStripLabel.Size = new System.Drawing.Size(129, 22);
+            measureToolStripLabel.Text = "Measure: Ctrl+Click";
+            //
             // fileToolStripMenuItem
-            // 
+            //
             fileToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { openToolStripMenuItem, saveToolStripMenuItem, saveAsToolStripMenuItem, exitToolStripMenuItem });
             fileToolStripMenuItem.Name = "fileToolStripMenuItem";
             fileToolStripMenuItem.Size = new System.Drawing.Size(37, 20);
@@ -312,7 +369,65 @@ namespace NCneticStandalone
         private void Step()
         {
             if (job.MoveList.Any() && trackBar.Value < job.MoveList.Count - 1)
+            {
                 trackBar.Value++;
+            }
+            else if (_playing)
+            {
+                _timer.Stop();
+                _playing = false;
+            }
+        }
+
+        private void StepBackward()
+        {
+            if (job.MoveList.Any() && trackBar.Value > 0)
+            {
+                trackBar.Value--;
+            }
+        }
+
+        private void HandleMeasureClick(int x, int y)
+        {
+            if (view.TryGetMeasurePoint(x, y, out Vector3 pt))
+            {
+                if (measureStartPoint == null)
+                {
+                    measureStartPoint = pt;
+                    measureToolStripLabel.Text = $"Measure: start ({pt.X:0.000}, {pt.Y:0.000}, {pt.Z:0.000})";
+                }
+                else
+                {
+                    Vector3 delta = pt - measureStartPoint.Value;
+                    double len = delta.Length;
+                    measureToolStripLabel.Text = $"Δ ({delta.X:0.000}, {delta.Y:0.000}, {delta.Z:0.000}) | L = {len:0.000}";
+                    measureStartPoint = null;
+                }
+            }
+            else
+            {
+                measureToolStripLabel.Text = "Measure: no hit";
+                measureStartPoint = null;
+            }
+        }
+
+        private void MainForm_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (job.MoveList == null || !job.MoveList.Any())
+            {
+                return;
+            }
+
+            if (e.KeyCode == Keys.Right)
+            {
+                Step();
+                e.Handled = true;
+            }
+            else if (e.KeyCode == Keys.Left)
+            {
+                StepBackward();
+                e.Handled = true;
+            }
         }
     }
 }

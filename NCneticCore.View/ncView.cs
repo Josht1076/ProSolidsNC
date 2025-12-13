@@ -353,6 +353,20 @@ namespace NCneticCore.View
                 MoveSelected?.Invoke(this, new MoveSelectedEventArgs(ms.moveguid, ms.moveid));
             }
         }
+
+        public bool TryGetMeasurePoint(int X, int Y, out Vector3 pt)
+        {
+            MoveSelection ms = GetMoveByMousePos(X, Y);
+
+            if (ms.move == null)
+            {
+                pt = Vector3.Zero;
+                return false;
+            }
+
+            pt = ms.point;
+            return true;
+        }
         #endregion
 
         #region loading
@@ -1774,8 +1788,8 @@ namespace NCneticCore.View
             internal CAO.MoveObject move;
             internal string moveguid;
             internal int moveid;
-            private Vector3 point;
-            private float ratio;
+            internal Vector3 point;
+            internal float ratio;
             #endregion
 
             #region constructors

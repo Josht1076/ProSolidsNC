@@ -36,6 +36,7 @@
             this.lrStatusLabel = new System.Windows.Forms.ToolStripStatusLabel();
             this.fStatusLabel = new System.Windows.Forms.ToolStripStatusLabel();
             this.sStatusLabel = new System.Windows.Forms.ToolStripStatusLabel();
+            this.measureStatusLabel = new System.Windows.Forms.ToolStripStatusLabel();
             this.glControl = new OpenTK.GLControl();
             this.progressBar = new System.Windows.Forms.ProgressBar();
             ((System.ComponentModel.ISupportInitialize)(this.trackBar)).BeginInit();
@@ -61,7 +62,8 @@
             this.zStatusLabel,
             this.lrStatusLabel,
             this.fStatusLabel,
-            this.sStatusLabel});
+            this.sStatusLabel,
+            this.measureStatusLabel});
             this.statusStrip.Location = new System.Drawing.Point(0, 0);
             this.statusStrip.Name = "statusStrip";
             this.statusStrip.Size = new System.Drawing.Size(771, 24);
@@ -105,14 +107,21 @@
             this.fStatusLabel.Text = "F = 0.000";
             // 
             // sStatusLabel
-            // 
+            //
             this.sStatusLabel.BorderSides = System.Windows.Forms.ToolStripStatusLabelBorderSides.Left;
             this.sStatusLabel.Name = "sStatusLabel";
             this.sStatusLabel.Size = new System.Drawing.Size(58, 19);
             this.sStatusLabel.Text = "S = 0.000";
-            // 
+            //
+            // measureStatusLabel
+            //
+            this.measureStatusLabel.BorderSides = System.Windows.Forms.ToolStripStatusLabelBorderSides.Left;
+            this.measureStatusLabel.Name = "measureStatusLabel";
+            this.measureStatusLabel.Size = new System.Drawing.Size(78, 19);
+            this.measureStatusLabel.Text = "Measure: --";
+            //
             // glControl
-            // 
+            //
             this.glControl.BackColor = System.Drawing.Color.Black;
             this.glControl.Dock = System.Windows.Forms.DockStyle.Fill;
             this.glControl.Location = new System.Drawing.Point(0, 24);
@@ -160,6 +169,7 @@
         private System.Windows.Forms.ToolStripStatusLabel lrStatusLabel;
         private System.Windows.Forms.ToolStripStatusLabel fStatusLabel;
         private System.Windows.Forms.ToolStripStatusLabel sStatusLabel;
+        private System.Windows.Forms.ToolStripStatusLabel measureStatusLabel;
         private OpenTK.GLControl glControl;
         public System.Windows.Forms.ProgressBar progressBar;
     }
