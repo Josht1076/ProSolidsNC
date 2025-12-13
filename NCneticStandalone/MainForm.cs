@@ -38,6 +38,7 @@ namespace NCneticStandalone
         private ToolStrip toolStrip1;
         private ToolStripButton toolStripButton1;
         private ToolStripButton toolStripButton2;
+        private ToolStripButton toolStripButton3;
         private ToolStripMenuItem fileToolStripMenuItem;
         private ToolStripMenuItem openToolStripMenuItem;
         private ToolStripMenuItem saveToolStripMenuItem;
@@ -49,6 +50,7 @@ namespace NCneticStandalone
         // Timer for play/pause
         private Timer _timer;
         private bool _playing;
+        private bool _syncingSelection;
 
         public MainForm()
         {
@@ -83,6 +85,7 @@ namespace NCneticStandalone
             trackBar.Dock = DockStyle.Bottom;
             trackBar.Minimum = 0;
             trackBar.ValueChanged += TrackBar_ValueChanged;
+            editor.SelectionChanged += Editor_SelectionChanged;
 
            // openItem.Click += OpenItem_Click;
           //  reloadItem.Click += ReloadItem_Click;
@@ -113,19 +116,14 @@ namespace NCneticStandalone
                 int selId = job.MoveList.FindIndex(m => m.MoveGuid == e.guid);
                 if (selId >= 0)
                 {
-                    trackBar.Value = selId;
-                    HighlightLine(job.MoveList[selId].Line);
+                    SelectMoveIndex(selId);
                 }
             };
         }
 
         private void TrackBar_ValueChanged(object sender, EventArgs e)
         {
-            if (job.MoveList.Any() && trackBar.Value < job.MoveList.Count)
-            {
-                view.SelectMove(job.MoveList[trackBar.Value]);
-                HighlightLine(job.MoveList[trackBar.Value].Line);
-            }
+            SelectMoveIndex(trackBar.Value, false);
         }
 
         private void HighlightLine(int line)
@@ -133,8 +131,37 @@ namespace NCneticStandalone
             if (line >= 0 && line < editor.Lines.Length)
             {
                 int idx = editor.GetFirstCharIndexFromLine(line);
+                _syncingSelection = true;
                 editor.SelectionStart = idx;
                 editor.ScrollToCaret();
+                _syncingSelection = false;
+            }
+        }
+
+        private void Editor_SelectionChanged(object sender, EventArgs e)
+        {
+            if (_syncingSelection || !job.MoveList.Any()) return;
+
+            int line = editor.GetLineFromCharIndex(editor.SelectionStart);
+            int selId = job.MoveList.FindIndex(m => m.Line == line);
+
+            if (selId >= 0)
+            {
+                SelectMoveIndex(selId);
+            }
+        }
+
+        private void SelectMoveIndex(int index, bool updateTrackBar = true)
+        {
+            if (!job.MoveList.Any() || index < 0 || index >= job.MoveList.Count)
+                return;
+
+            view.SelectMove(job.MoveList[index]);
+            HighlightLine(job.MoveList[index].Line);
+
+            if (updateTrackBar && trackBar.Value != index)
+            {
+                trackBar.Value = index;
             }
         }
 
@@ -149,6 +176,10 @@ namespace NCneticStandalone
                 view.Recenter();
                 trackBar.Maximum = Math.Max(0, job.MoveList.Count - 1);
                 trackBar.Value = 0;
+                if (job.MoveList.Any())
+                {
+                    SelectMoveIndex(0);
+                }
             };
         }
 
@@ -178,6 +209,7 @@ namespace NCneticStandalone
             toolStrip1 = new ToolStrip();
             toolStripButton1 = new ToolStripButton();
             toolStripButton2 = new ToolStripButton();
+            toolStripButton3 = new ToolStripButton();
             fileToolStripMenuItem = new ToolStripMenuItem();
             openToolStripMenuItem = new ToolStripMenuItem();
             saveToolStripMenuItem = new ToolStripMenuItem();
@@ -198,10 +230,10 @@ namespace NCneticStandalone
             menuStrip1.Size = new System.Drawing.Size(1189, 24);
             menuStrip1.TabIndex = 0;
             menuStrip1.Text = "menuStrip1";
-            // 
+            //
             // toolStrip1
-            // 
-            toolStrip1.Items.AddRange(new ToolStripItem[] { toolStripButton1, toolStripButton2 });
+            //
+            toolStrip1.Items.AddRange(new ToolStripItem[] { toolStripButton1, toolStripButton2, toolStripButton3 });
             toolStrip1.Location = new System.Drawing.Point(0, 24);
             toolStrip1.Name = "toolStrip1";
             toolStrip1.Size = new System.Drawing.Size(1189, 25);
@@ -227,6 +259,16 @@ namespace NCneticStandalone
             toolStripButton2.Size = new System.Drawing.Size(23, 22);
             toolStripButton2.Text = "toolStripButton2";
             toolStripButton2.Click += toolStripButton2_Click;
+            //
+            // toolStripButton3
+            //
+            toolStripButton3.DisplayStyle = ToolStripItemDisplayStyle.Text;
+            toolStripButton3.ImageTransparentColor = System.Drawing.Color.Magenta;
+            toolStripButton3.Name = "toolStripButton3";
+            toolStripButton3.Size = new System.Drawing.Size(66, 22);
+            toolStripButton3.Text = "Step back";
+            toolStripButton3.ToolTipText = "Step backward one line";
+            toolStripButton3.Click += toolStripButton3_Click;
             // 
             // fileToolStripMenuItem
             // 
@@ -309,10 +351,17 @@ namespace NCneticStandalone
             Step();
         }
 
-        private void Step()
+        private void toolStripButton3_Click(object sender, EventArgs e)
         {
-            if (job.MoveList.Any() && trackBar.Value < job.MoveList.Count - 1)
-                trackBar.Value++;
+            Step(-1);
+        }
+
+        private void Step(int delta = 1)
+        {
+            if (!job.MoveList.Any()) return;
+
+            int nextIndex = Math.Clamp(trackBar.Value + delta, 0, job.MoveList.Count - 1);
+            SelectMoveIndex(nextIndex);
         }
     }
 }
