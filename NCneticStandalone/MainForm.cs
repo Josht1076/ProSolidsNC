@@ -12,26 +12,16 @@ namespace NCneticStandalone
     public class MainForm : Form
     {
         // Core UI components
-        private RichTextBox editor = new RichTextBox();
-        private GLControl glControl = new GLControl();
+        private readonly RichTextBox editor = new RichTextBox();
+        private readonly GLControl glControl = new GLControl();
 
         // Simulation & rendering
         private ncView view;
         private ncJob job = new ncJob();
-        private ncMachine machine = new ncMachine();
+        private readonly ncMachine machine = new ncMachine();
 
         // Playback controls
-        private TrackBar trackBar = new TrackBar();
-
-        // Manual split container (code/editor vs 3D view)
-        private SplitContainer split = new SplitContainer();
-
-        // Manual menu (optional)
-        //private MenuStrip menu = new MenuStrip();
-        //private ToolStripMenuItem fileMenu = new ToolStripMenuItem("File");
-        //private ToolStripMenuItem openItem = new ToolStripMenuItem("Open");
-        //private ToolStripMenuItem reloadItem = new ToolStripMenuItem("Reload");
-        //private ToolStripMenuItem exitItem = new ToolStripMenuItem("Exit");
+        private readonly TrackBar trackBar = new TrackBar();
 
         // Designer-generated components (hooked via InitializeComponent)
         private MenuStrip menuStrip1;
@@ -40,8 +30,7 @@ namespace NCneticStandalone
         private ToolStripButton toolStripButton2;
         private ToolStripMenuItem fileToolStripMenuItem;
         private ToolStripMenuItem openToolStripMenuItem;
-        private ToolStripMenuItem saveToolStripMenuItem;
-        private ToolStripMenuItem saveAsToolStripMenuItem;
+        private ToolStripMenuItem reloadToolStripMenuItem;
         private ToolStripMenuItem exitToolStripMenuItem;
         private SplitContainer splitContainer1;
         private string currentFile = string.Empty;
@@ -52,51 +41,73 @@ namespace NCneticStandalone
 
         public MainForm()
         {
-            // First, wire up any Designer controls
             InitializeComponent();
 
-            // Window settings
+            ConfigureWindow();
+            ConfigureLayout();
+            ConfigureMenu();
+            ConfigurePlayback();
+            InitializeView();
+        }
+
+        private void ConfigureWindow()
+        {
             Text = "NCnetic Standalone";
             Width = 1000;
             Height = 700;
+            MinimumSize = new System.Drawing.Size(900, 600);
+        }
 
-            // Set up manual split+controls
-            split.Dock = DockStyle.Fill;
-            split.SplitterDistance = 350;
-            split.Panel1.Controls.Add(editor);
-            split.Panel2.Controls.Add(glControl);
+        private void ConfigureLayout()
+        {
+            splitContainer1.Dock = DockStyle.Fill;
+            splitContainer1.SplitterDistance = (int)(Width * 0.35);
+            splitContainer1.FixedPanel = FixedPanel.None;
+            splitContainer1.Panel1MinSize = 200;
+            splitContainer1.Panel2MinSize = 400;
+
             editor.Dock = DockStyle.Fill;
+            editor.Font = new System.Drawing.Font("Consolas", 10);
+            editor.BackColor = System.Drawing.Color.FromArgb(30, 30, 30);
+            editor.ForeColor = System.Drawing.Color.WhiteSmoke;
+            editor.BorderStyle = BorderStyle.None;
+
             glControl.Dock = DockStyle.Fill;
+            glControl.VSync = true;
 
-            Controls.Add(split);
-            Controls.Add(trackBar);
-            //Controls.Add(menu);
+            splitContainer1.Panel1.Controls.Add(editor);
+            splitContainer1.Panel2.Controls.Add(glControl);
 
-            // Manual menu setup
-            //menu.Items.Add(fileMenu);
-            //fileMenu.DropDownItems.Add(openItem);
-            //fileMenu.DropDownItems.Add(reloadItem);
-            //fileMenu.DropDownItems.Add(new ToolStripSeparator());
-            //fileMenu.DropDownItems.Add(exitItem);
-
-            // TrackBar for stepping
             trackBar.Dock = DockStyle.Bottom;
             trackBar.Minimum = 0;
+            trackBar.TickStyle = TickStyle.BottomRight;
             trackBar.ValueChanged += TrackBar_ValueChanged;
+            Controls.Add(trackBar);
+            trackBar.BringToFront();
+        }
 
-           // openItem.Click += OpenItem_Click;
-          //  reloadItem.Click += ReloadItem_Click;
-          //  exitItem.Click += (s, e) => Close();
+        private void ConfigureMenu()
+        {
+            openToolStripMenuItem.Click += OpenItem_Click;
+            reloadToolStripMenuItem.Click += ReloadItem_Click;
+            exitToolStripMenuItem.Click += (s, e) => Close();
+        }
 
-            // Initialize view & OpenTK
+        private void ConfigurePlayback()
+        {
+            toolStripButton1.ToolTipText = "Play / Pause";
+            toolStripButton2.ToolTipText = "Step";
+            _timer = new Timer { Interval = 200 };
+            _timer.Tick += (s, e) => Step();
+            ResetPlayback();
+        }
+
+        private void InitializeView()
+        {
             view = new ncView(new ncViewOptions());
             view.IniGraphicContext(glControl.Handle);
             view.ViewPortLoad(glControl.Width, glControl.Height);
             HookViewEvents();
-
-            // Set up playback timer
-            _timer = new Timer { Interval = 200 };
-            _timer.Tick += (s, e) => Step();
         }
 
         private void HookViewEvents()
@@ -140,16 +151,33 @@ namespace NCneticStandalone
 
         private void LoadFile(string file)
         {
-            editor.Text = File.ReadAllText(file);
-            job = new ncJob { FileName = file, Text = editor.Text };
-            job.Process(machine);
-            job.EndProcessing += (s, e) =>
+            if (!File.Exists(file))
             {
-                view.LoadJob(job);
-                view.Recenter();
-                trackBar.Maximum = Math.Max(0, job.MoveList.Count - 1);
-                trackBar.Value = 0;
-            };
+                MessageBox.Show($"File not found: {file}", "Open", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            try
+            {
+                ResetPlayback();
+
+                var text = File.ReadAllText(file);
+                editor.Text = text;
+                job = new ncJob { FileName = file, Text = text };
+                job.EndProcessing += (s, e) =>
+                {
+                    view.LoadJob(job);
+                    view.Recenter();
+                    trackBar.Maximum = Math.Max(0, job.MoveList.Count - 1);
+                    trackBar.Enabled = job.MoveList.Any();
+                    trackBar.Value = 0;
+                };
+                job.Process(machine);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message, "Unable to load file", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void OpenItem_Click(object sender, EventArgs e)
@@ -172,6 +200,15 @@ namespace NCneticStandalone
                 LoadFile(currentFile);
         }
 
+        private void ResetPlayback()
+        {
+            _timer?.Stop();
+            _playing = false;
+            trackBar.Maximum = 0;
+            trackBar.Value = 0;
+            trackBar.Enabled = false;
+        }
+
         private void InitializeComponent()
         {
             menuStrip1 = new MenuStrip();
@@ -180,8 +217,7 @@ namespace NCneticStandalone
             toolStripButton2 = new ToolStripButton();
             fileToolStripMenuItem = new ToolStripMenuItem();
             openToolStripMenuItem = new ToolStripMenuItem();
-            saveToolStripMenuItem = new ToolStripMenuItem();
-            saveAsToolStripMenuItem = new ToolStripMenuItem();
+            reloadToolStripMenuItem = new ToolStripMenuItem();
             exitToolStripMenuItem = new ToolStripMenuItem();
             splitContainer1 = new SplitContainer();
             menuStrip1.SuspendLayout();
@@ -207,7 +243,7 @@ namespace NCneticStandalone
             toolStrip1.Size = new System.Drawing.Size(1189, 25);
             toolStrip1.TabIndex = 1;
             toolStrip1.Text = "toolStrip1";
-            // 
+            //
             // toolStripButton1
             // 
             toolStripButton1.DisplayStyle = ToolStripItemDisplayStyle.Image;
@@ -227,35 +263,30 @@ namespace NCneticStandalone
             toolStripButton2.Size = new System.Drawing.Size(23, 22);
             toolStripButton2.Text = "toolStripButton2";
             toolStripButton2.Click += toolStripButton2_Click;
-            // 
+            //
             // fileToolStripMenuItem
-            // 
-            fileToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { openToolStripMenuItem, saveToolStripMenuItem, saveAsToolStripMenuItem, exitToolStripMenuItem });
+            //
+            fileToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { openToolStripMenuItem, reloadToolStripMenuItem, exitToolStripMenuItem });
             fileToolStripMenuItem.Name = "fileToolStripMenuItem";
             fileToolStripMenuItem.Size = new System.Drawing.Size(37, 20);
             fileToolStripMenuItem.Text = "File";
-            // 
+            //
             // openToolStripMenuItem
-            // 
+            //
             openToolStripMenuItem.Name = "openToolStripMenuItem";
             openToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
             openToolStripMenuItem.Text = "Open";
-            openToolStripMenuItem.Click += openToolStripMenuItem_Click;
-            // 
-            // saveToolStripMenuItem
-            // 
-            saveToolStripMenuItem.Name = "saveToolStripMenuItem";
-            saveToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
-            saveToolStripMenuItem.Text = "Save";
-            // 
-            // saveAsToolStripMenuItem
-            // 
-            saveAsToolStripMenuItem.Name = "saveAsToolStripMenuItem";
-            saveAsToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
-            saveAsToolStripMenuItem.Text = "Save As";
-            // 
+            openToolStripMenuItem.Click += OpenItem_Click;
+            //
+            // reloadToolStripMenuItem
+            //
+            reloadToolStripMenuItem.Name = "reloadToolStripMenuItem";
+            reloadToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            reloadToolStripMenuItem.Text = "Reload";
+            reloadToolStripMenuItem.Click += ReloadItem_Click;
+            //
             // exitToolStripMenuItem
-            // 
+            //
             exitToolStripMenuItem.Name = "exitToolStripMenuItem";
             exitToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
             exitToolStripMenuItem.Text = "Exit";
@@ -287,12 +318,6 @@ namespace NCneticStandalone
             PerformLayout();
 
 
-        }
-
-        private void openToolStripMenuItem_Click(object sender, EventArgs e)
-        {
-            // Designer "Open" routes here
-            OpenItem_Click(sender, e);
         }
 
         private void toolStripButton1_Click(object sender, EventArgs e)
