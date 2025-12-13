@@ -28,6 +28,8 @@ namespace NCneticNpp
         int DownMouseX = 0;
         int DownMouseY = 0;
 
+        Vector3? measureStartPoint = null;
+
         public int currentLine = -1;
 
         public string currentFile = "";
@@ -56,6 +58,8 @@ namespace NCneticNpp
         public ViewForm()
         {
             InitializeComponent();
+
+            KeyPreview = true;
 
             view = new ncView(new ncViewOptions());
             view.IniGraphicContext(this.Handle);
@@ -88,7 +92,14 @@ namespace NCneticNpp
 
                 if (ea.Button == MouseButtons.Left)
                 {
-                    view.MouseMoveSelect(ea.X, ea.Y);
+                    if (ModifierKeys.HasFlag(Keys.Control))
+                    {
+                        HandleMeasureClick(ea.X, ea.Y);
+                    }
+                    else
+                    {
+                        view.MouseMoveSelect(ea.X, ea.Y);
+                    }
                 }
             });
             glControl.MouseWheel += new MouseEventHandler((s, ea) =>
@@ -115,6 +126,25 @@ namespace NCneticNpp
             {
                 view.Recenter();
             });
+
+            KeyDown += (s, ea) =>
+            {
+                if (job == null || job.MoveList == null || !job.MoveList.Any())
+                {
+                    return;
+                }
+
+                if (ea.KeyCode == Keys.Right)
+                {
+                    StepBy(1);
+                    ea.Handled = true;
+                }
+                else if (ea.KeyCode == Keys.Left)
+                {
+                    StepBy(-1);
+                    ea.Handled = true;
+                }
+            };
 
             view.Refresh += new EventHandler((s, ea) =>
             {
@@ -147,6 +177,40 @@ namespace NCneticNpp
             });
         }
 
+        private void HandleMeasureClick(int x, int y)
+        {
+            if (view.TryGetMeasurePoint(x, y, out Vector3 pt))
+            {
+                if (measureStartPoint == null)
+                {
+                    measureStartPoint = pt;
+                    measureStatusLabel.Text = $"Measure: start ({pt.X:0.000}, {pt.Y:0.000}, {pt.Z:0.000})";
+                }
+                else
+                {
+                    Vector3 delta = pt - measureStartPoint.Value;
+                    double len = delta.Length;
+                    measureStatusLabel.Text = $"Δ ({delta.X:0.000}, {delta.Y:0.000}, {delta.Z:0.000}) | L = {len:0.000}";
+                    measureStartPoint = null;
+                }
+            }
+            else
+            {
+                measureStatusLabel.Text = "Measure: no hit";
+                measureStartPoint = null;
+            }
+        }
+
+        private void StepBy(int delta)
+        {
+            int newValue = Math.Max(trackBar.Minimum, Math.Min(trackBar.Maximum, trackBar.Value + delta));
+
+            if (newValue != trackBar.Value)
+            {
+                trackBar.Value = newValue;
+            }
+        }
+
         public void LoadFile(string file, string text, ncMachine mach, int cam)
         {
             currentFile = file;
@@ -171,6 +235,9 @@ namespace NCneticNpp
                 trackBar.LargeChange = trackBar.Maximum / 20;
 
                 progressBar.Style = ProgressBarStyle.Continuous;
+
+                measureStartPoint = null;
+                measureStatusLabel.Text = "Measure: Ctrl+Click two points";
             });
         }
 
@@ -217,6 +284,8 @@ namespace NCneticNpp
             lrStatusLabel.Text = "L = 0.000";
             fStatusLabel.Text = "F = 0.000";
             sStatusLabel.Text = "S = 0.000";
+            measureStatusLabel.Text = "Measure: --";
+            measureStartPoint = null;
         }
 
         private void DisplayProperties(ncMove move)
